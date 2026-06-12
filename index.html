@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>MESSI 10 – Live TV | FIFA+ & Sports Hub</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MESSI 10">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#f0c040;--red:#e02020;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;user-select:none;-webkit-user-select:none;}
+#vid{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:block;z-index:1;}
+#osd{position:fixed;bottom:60px;right:40px;z-index:10;display:flex;flex-direction:column;align-items:flex-end;gap:4px;opacity:0;transition:opacity .3s;pointer-events:none;font-family:'Bebas Neue',cursive;}
+#osd.show{opacity:1;}
+#osd-num{font-size:4rem;letter-spacing:4px;color:var(--gold);text-shadow:0 2px 12px rgba(0,0,0,.9);line-height:1;}
+#osd-name{font-size:1.4rem;letter-spacing:3px;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.9);}
+#osd-status{font-size:.8rem;letter-spacing:2px;color:rgba(255,255,255,.5);}
+#live-badge{position:fixed;top:20px;left:24px;z-index:10;display:flex;align-items:center;gap:6px;background:var(--red);color:#fff;font-family:'Bebas Neue',cursive;font-size:11px;letter-spacing:2px;padding:3px 10px;border-radius:3px;opacity:0;transition:opacity .4s;}
+#live-badge.show{opacity:1;}
+#live-dot{width:5px;height:5px;border-radius:50%;background:#fff;animation:pulse 1.4s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+#retry{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(240,192,64,.15);border:1px solid rgba(240,192,64,.4);color:var(--gold);font-family:'Bebas Neue',cursive;font-size:11px;letter-spacing:2px;padding:4px 14px;border-radius:4px;display:none;}
+#audioOv{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:20;}
+#audioOv p{color:rgba(255,255,255,.5);font-family:sans-serif;font-size:13px;}
+#unmuteBtn{background:var(--gold);color:#000;border:none;border-radius:8px;font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:3px;padding:14px 40px;cursor:pointer;}
+#chOverlay{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:30;display:none;flex-direction:column;}
+#chOverlay.open{display:flex;}
+#ovHead{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #222;flex-shrink:0;}
+#ovTitle{font-family:'Bebas Neue',cursive;font-size:1.5rem;letter-spacing:4px;color:var(--gold);}
+#ovClose{font-family:'Bebas Neue',cursive;font-size:11px;letter-spacing:2px;color:#444;padding:4px 10px;border:1px solid #333;border-radius:4px;cursor:pointer;}
+#ovSearch{padding:10px 20px;border-bottom:1px solid #1a1a1a;flex-shrink:0;}
+#ovSearch input{width:100%;background:#111;border:1px solid #2a2a2a;color:#f5f5f5;font-size:14px;padding:8px 14px;border-radius:6px;outline:none;}
+#ovSearch input:focus{border-color:var(--gold);}
+#ovCats{display:flex;border-bottom:1px solid #1a1a1a;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+#ovCats::-webkit-scrollbar{display:none;}
+.ov-tab{padding:9px 14px;font-family:'Bebas Neue',cursive;font-size:11px;letter-spacing:1.5px;color:#555;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0;}
+.ov-tab:hover{color:#fff;}
+.ov-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+#ovList{flex:1;overflow-y:auto;padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;align-content:start;}
+#ovList::-webkit-scrollbar{width:3px;}
+#ovList::-webkit-scrollbar-thumb{background:#222;}
+.ov-card{display:flex;flex-direction:column;align-items:center;padding:14px 10px;border-radius:8px;border:1px solid #1e1e1e;cursor:pointer;background:#0e0e0e;transition:all .15s;text-align:center;}
+.ov-card:hover,.ov-card:focus{background:#1a1a1a;border-color:#333;}
+.ov-card.active{background:rgba(240,192,64,.08);border-color:rgba(240,192,64,.4);}
+.ov-card.active .ov-cname{color:var(--gold);}
+.ov-logo{width:48px;height:48px;border-radius:6px;background:#161616;border:1px solid #222;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px;}
+.ov-logo img{width:100%;height:100%;object-fit:contain;padding:4px;}
+.ov-logo .ini{font-family:'Bebas Neue',cursive;font-size:11px;color:#444;}
+.ov-cname{font-size:12px;font-weight:600;color:#ccc;line-height:1.3;}
+.ov-cnum{font-family:'Bebas Neue',cursive;font-size:10px;color:#333;margin-top:3px;}
+.ov-nores{grid-column:1/-1;text-align:center;padding:40px;color:#555;font-size:13px;}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:none;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:#111;border:1px solid #2a2a2a;border-radius:12px;padding:22px;width:480px;max-width:94vw;}
+.modal h2{font-family:'Bebas Neue',cursive;font-size:1.3rem;letter-spacing:3px;color:var(--gold);margin-bottom:6px;}
+.modal p{font-size:12px;color:#555;margin-bottom:14px;}
+.modal label{font-size:11px;color:#555;display:block;margin-bottom:5px;}
+.modal input{width:100%;background:#0a0a0a;border:1px solid #2a2a2a;color:#f5f5f5;font-size:13px;padding:8px 10px;border-radius:5px;margin-bottom:12px;}
+.modal input:focus{border-color:var(--gold);}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;}
+.m-btn{font-family:'Bebas Neue',cursive;font-size:12px;letter-spacing:2px;padding:8px 18px;border-radius:5px;border:none;cursor:pointer;}
+.m-btn.save{background:var(--gold);color:#000;}
+.m-btn.cancel{background:#222;color:#666;}
+.loader-overlay{position:fixed;inset:0;background:#000;z-index:100;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',cursive;color:var(--gold);font-size:1.2rem;letter-spacing:2px;gap:10px;background:rgba(0,0,0,0.95);}
+.loader-overlay.hide{display:none;}
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+</style>
+</head>
+<body>
+<video id="vid" preload="auto" crossorigin="anonymous"></video>
+<div id="live-badge"><div id="live-dot"></div>LIVE</div>
+<div id="retry">⟳ TRYING BACKUP...</div>
+<div id="osd"><div id="osd-num">01</div><div id="osd-name">Loading...</div><div id="osd-status"></div></div>
+<div id="audioOv"><p>AUTOPLAY BLOCKED</p><button id="unmuteBtn" onclick="unlockAudio()">▶ UNMUTE &amp; PLAY</button></div>
+<div id="chOverlay"><div id="ovHead"><span id="ovTitle">⚽ MESSI 10 – CHANNELS</span><span id="ovClose" onclick="closeOverlay()">✕ CLOSE</span></div><div id="ovSearch"><input type="text" id="searchInput" placeholder="🔍 Search channels..." oninput="doSearch(this.value)"></div><div id="ovCats"></div><div id="ovList"></div></div>
+<div class="modal-bg" id="modalBg" onclick="closeEdit()"><div class="modal" onclick="event.stopPropagation()"><h2>✎ Edit Channel URL</h2><p>Update .m3u8 links. Primary + backups auto retry.</p><label>Channel</label><input type="text" id="editName" readonly style="opacity:.4;"><label>Primary URL</label><input type="text" id="editUrl1" placeholder="https://..."><label>Backup URL 1</label><input type="text" id="editUrl2" placeholder="Backup stream"><label>Backup URL 2</label><input type="text" id="editUrl3" placeholder="Second backup"><div class="modal-btns"><button class="m-btn cancel" onclick="closeEdit()">CANCEL</button><button class="m-btn save" onclick="saveEdit()">SAVE &amp; PLAY</button></div></div></div>
+<div id="loaderOverlay" class="loader-overlay"><span>⚽ LOADING CHANNELS FROM IPTV.M3U8 ...</span></div>
+
+<script>
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+// --------------------------------------------------------------
+//  FETCH & PARSE EXTERNAL IPTV.M3U8 FILE
+//  Extract: name, logo, group-title (category), URL
+// --------------------------------------------------------------
+async function loadChannelsFromM3U() {
+    const resp = await fetch('./iptv.m3u8');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} - iptv.m3u8 not found`);
+    const text = await resp.text();
+    const lines = text.split(/\r?\n/);
+    const channels = [];
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (line.startsWith('#EXTINF')) {
+            // Extract tvg-logo
+            let logo = '';
+            const logoMatch = line.match(/tvg-logo="([^"]*)"/);
+            if (logoMatch) logo = logoMatch[1];
+            
+            // Extract group-title (category)
+            let category = 'Uncategorized';
+            const groupMatch = line.match(/group-title="([^"]*)"/);
+            if (groupMatch) category = groupMatch[1];
+            
+            // Extract channel name (after last comma)
+            let name = '';
+            const nameMatch = line.match(/,[ \t]*(.+)$/);
+            if (nameMatch) name = nameMatch[1].trim();
+            if (!name) name = 'Unknown Channel';
+            
+            // Find the next non-empty, non-comment line as URL
+            let urlLine = '';
+            for (let j = i+1; j < lines.length; j++) {
+                let next = lines[j].trim();
+                if (next && !next.startsWith('#')) {
+                    urlLine = next;
+                    i = j;
+                    break;
+                }
+            }
+            if (urlLine) {
+                channels.push({ 
+                    name, 
+                    logo, 
+                    category,   // from group-title
+                    urls: [urlLine] 
+                });
+            }
+        }
+    }
+    if (channels.length === 0) throw new Error('No valid channels found in iptv.m3u8');
+    return channels;
+}
+
+let channels = [];           // Will be filled in M3U order (no sorting)
+let hls=null, curIdx=0, activeCat='All', searchQ='';
+let osdTimer=null, _firstPlay=true;
+let editIdx=-1;
+
+const vid = document.getElementById('vid');
+const audioOv = document.getElementById('audioOv');
+const osd = document.getElementById('osd');
+const osdNum = document.getElementById('osd-num');
+const osdName = document.getElementById('osd-name');
+const osdStatus = document.getElementById('osd-status');
+const liveBadge = document.getElementById('live-badge');
+const retryEl = document.getElementById('retry');
+const ovEl = document.getElementById('chOverlay');
+const ovCatsEl = document.getElementById('ovCats');
+const ovListEl = document.getElementById('ovList');
+const loaderOverlay = document.getElementById('loaderOverlay');
+
+function initUI() {
+    // Get unique categories from channels (excluding empty ones)
+    const uniqueCats = [...new Set(channels.map(c => c.category).filter(c => c && c.trim() !== ''))];
+    const cats = ['All', ...uniqueCats];
+    ovCatsEl.innerHTML = '';
+    cats.forEach(cat=>{
+        const t=document.createElement('div'); 
+        t.className='ov-tab'+(cat==='All'?' active':''); 
+        t.textContent=cat;
+        t.onclick=()=>{ 
+            activeCat=cat; 
+            document.querySelectorAll('.ov-tab').forEach(x=>x.classList.remove('active')); 
+            t.classList.add('active'); 
+            renderOverlay(); 
+        };
+        ovCatsEl.appendChild(t);
+    });
+    renderOverlay();
+    // Start with first channel (index 0)
+    switchCh(0);
+    loaderOverlay.classList.add('hide');
+}
+
+// Filter channels by category & search, keep original order
+function getFiltered(){
+    return channels.filter((c, idx) => 
+        (activeCat==='All' || c.category === activeCat) && 
+        (!searchQ || c.name.toLowerCase().includes(searchQ))
+    );
+}
+
+function renderOverlay(){
+    ovListEl.innerHTML=''; 
+    const list=getFiltered();
+    if(!list.length){ 
+        ovListEl.innerHTML='<div class="ov-nores">No channels found</div>'; 
+        return; 
+    }
+    list.forEach(ch=>{ 
+        const ri = channels.indexOf(ch);   // original index
+        const card=document.createElement('div');
+        card.className='ov-card'+(ri===curIdx?' active':''); 
+        card.id='oc-'+ri; 
+        card.tabIndex=0;
+        const ini=ch.name.split(' ').map(w=>w[0]).join('').substring(0,3).toUpperCase();
+        card.innerHTML=`<div class="ov-logo">${ch.logo?`<img src="${ch.logo}" alt="" onerror="this.parentElement.innerHTML='<span class=ini>${ini}</span>'">`:`<span class="ini">${ini}</span>`}</div><div class="ov-cname">${ch.name}</div><div class="ov-cnum">CH ${ri+1}</div>`;
+        card.onclick=()=>{ switchCh(ri); closeOverlay(); };
+        ovListEl.appendChild(card);
+    });
+    const ac=document.getElementById('oc-'+curIdx); 
+    if(ac) setTimeout(()=>ac.scrollIntoView({block:'center'}),50);
+}
+function openOverlay(){ renderOverlay(); ovEl.classList.add('open'); document.getElementById('searchInput').focus(); }
+function closeOverlay(){ ovEl.classList.remove('open'); }
+function showOsd(ch,idx){ 
+    osdNum.textContent=String(idx+1).padStart(2,'0'); 
+    osdName.textContent=ch.name; 
+    osd.classList.add('show'); 
+    clearTimeout(osdTimer); 
+    osdTimer=setTimeout(()=>osd.classList.remove('show'),2500); 
+}
+function tryUrl(ch,urlIdx){
+    if(urlIdx>=ch.urls.length){ 
+        osdStatus.textContent='✕ ALL URLs FAILED'; 
+        retryEl.style.display='none'; 
+        return; 
+    }
+    osdStatus.textContent=urlIdx===0?'⟳ CONNECTING...':`⟳ BACKUP ${urlIdx}...`; 
+    retryEl.style.display=urlIdx>0?'block':'none'; 
+    liveBadge.classList.remove('show');
+    if(hls){ hls.destroy(); hls=null; }
+    if(Hls.isSupported()){
+        hls=new Hls({maxBufferLength:10,maxMaxBufferLength:20,enableWorker:true,manifestLoadingTimeOut:8000,manifestLoadingMaxRetry:1});
+        hls.loadSource(ch.urls[urlIdx]); 
+        hls.attachMedia(vid);
+        hls.on(Hls.Events.MANIFEST_PARSED,()=>{ 
+            retryEl.style.display='none'; 
+            osdStatus.textContent='● LIVE'; 
+            liveBadge.classList.add('show'); 
+            tryPlay(); 
+        });
+        hls.on(Hls.Events.ERROR,(e,d)=>{ 
+            if(d.fatal){ 
+                hls.destroy(); 
+                hls=null; 
+                setTimeout(()=>tryUrl(ch,urlIdx+1),1200); 
+            } 
+        });
+    } else if(vid.canPlayType('application/vnd.apple.mpegurl')){
+        vid.src=ch.urls[urlIdx]; 
+        vid.load();
+        vid.onerror=()=>tryUrl(ch,urlIdx+1);
+        vid.oncanplay=()=>{ 
+            osdStatus.textContent='● LIVE'; 
+            liveBadge.classList.add('show'); 
+            tryPlay(); 
+        };
+    }
+}
+function tryPlay(){
+    if(_firstPlay){ 
+        _firstPlay=false; 
+        const el=document.documentElement; 
+        const req=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen; 
+        if(req&&!document.fullscreenElement) req.call(el).catch(()=>{}); 
+    }
+    vid.muted=false; 
+    vid.volume=1.0;
+    vid.play().then(()=>{ audioOv.style.display='none'; }).catch(()=>{ 
+        vid.muted=true; 
+        vid.play().then(()=>{ audioOv.style.display='flex'; }).catch(()=>{}); 
+    });
+}
+function unlockAudio(){ vid.muted=false; audioOv.style.display='none'; }
+function switchCh(idx){ if(idx<0||idx>=channels.length)return; curIdx=idx; const ch=channels[idx]; showOsd(ch,idx); tryUrl(ch,0); }
+function openEdit(){ editIdx=curIdx; const ch=channels[curIdx]; document.getElementById('editName').value=ch.name; document.getElementById('editUrl1').value=ch.urls[0]||''; document.getElementById('editUrl2').value=ch.urls[1]||''; document.getElementById('editUrl3').value=ch.urls[2]||''; document.getElementById('modalBg').classList.add('open'); document.getElementById('editUrl1').focus(); }
+function closeEdit(){ document.getElementById('modalBg').classList.remove('open'); }
+function saveEdit(){ if(editIdx<0)return; const urls=[document.getElementById('editUrl1').value.trim(),document.getElementById('editUrl2').value.trim(),document.getElementById('editUrl3').value.trim()].filter(u=>u); if(!urls.length){ alert('অন্তত একটা URL দিন'); return; } const chName = channels[editIdx].name; channels[editIdx].urls=urls; localStorage.setItem(`m10_urls_name_${chName}`,JSON.stringify(urls)); closeEdit(); switchCh(editIdx); }
+function doSearch(v){ searchQ=v.trim().toLowerCase(); renderOverlay(); }
+
+window.addEventListener('keydown',e=>{
+    const tag=document.activeElement.tagName; const inInput=tag==='INPUT'||tag==='TEXTAREA';
+    if(inInput) return;
+    const ovOpen=ovEl.classList.contains('open'); const editOpen=document.getElementById('modalBg').classList.contains('open');
+    if(editOpen){ if(e.key==='Escape') closeEdit(); return; }
+    if(ovOpen){ if(e.key==='Escape') closeOverlay(); return; }
+    e.preventDefault();
+    if(e.key==='ArrowUp'||e.key==='ArrowLeft'){ if(curIdx>0) switchCh(curIdx-1); }
+    if(e.key==='ArrowDown'||e.key==='ArrowRight'){ if(curIdx<channels.length-1) switchCh(curIdx+1); }
+    if(e.key==='Enter'){ if(audioOv.style.display==='flex') unlockAudio(); else openOverlay(); }
+    if(e.key==='e'||e.key==='E') openEdit();
+    if(e.key==='f'||e.key==='F'){ if(!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); }
+    if(e.key===' '){ if(vid.paused) vid.play(); else vid.pause(); }
+},true);
+
+// --------------------------------------------------------------
+//  LOAD M3U, PRESERVE ORDER, RESTORE EDITS, INIT PLAYER
+// --------------------------------------------------------------
+(async function bootstrap() {
+    try {
+        const raw = await loadChannelsFromM3U();
+        // Build channel list exactly in M3U order (no sorting)
+        channels = raw.map(ch => ({
+            name: ch.name,
+            logo: ch.logo || "",
+            category: ch.category || "Uncategorized",
+            urls: ch.urls
+        }));
+        // Restore edited URLs from localStorage
+        for (let i=0; i<channels.length; i++) {
+            const saved = localStorage.getItem(`m10_urls_name_${channels[i].name}`);
+            if (saved) {
+                try { channels[i].urls = JSON.parse(saved); } catch(e) {}
+            }
+        }
+        initUI();
+    } catch(err) {
+        console.error(err);
+        loaderOverlay.innerHTML = `<span>❌ ERROR: ${err.message}<br>Make sure "iptv.m3u8" exists in the same folder.</span>`;
+        loaderOverlay.style.background = '#000';
+    }
+})();
+</script>
+</body>
+</html>
